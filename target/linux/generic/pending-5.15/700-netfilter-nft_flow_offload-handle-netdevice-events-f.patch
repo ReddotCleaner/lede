@@ -1,0 +1,80 @@
+From: Pablo Neira Ayuso <pablo@netfilter.org>
+Date: Thu, 25 Jan 2018 12:58:55 +0100
+Subject: [PATCH] netfilter: nft_flow_offload: handle netdevice events from
+ nf_flow_table
+
+Move the code that deals with device events to the core.
+
+Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
+---
+
+--- a/net/netfilter/nf_flow_table_core.c
++++ b/net/netfilter/nf_flow_table_core.c
+@@ -661,0 +662,17 @@
++static int nf_flow_table_netdev_event(struct notifier_block *this,
++				      unsigned long event, void *ptr)
++{
++	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
++
++	if (event != NETDEV_DOWN)
++		return NOTIFY_DONE;
++
++	nf_flow_table_cleanup(dev);
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block flow_offload_netdev_notifier = {
++	.notifier_call	= nf_flow_table_netdev_event,
++};
++
+@@ -673,0 +691,4 @@
++	ret = register_netdevice_notifier(&flow_offload_netdev_notifier);
++	if (ret)
++		goto out_offload_init;
++
+@@ -675,0 +697,2 @@
++out_offload_init:
++	nf_flow_table_offload_exit();
+@@ -682,0 +706 @@
++	unregister_netdevice_notifier(&flow_offload_netdev_notifier);
+--- a/net/netfilter/nft_flow_offload.c
++++ b/net/netfilter/nft_flow_offload.c
+@@ -471,17 +470,0 @@
+-static int flow_offload_netdev_event(struct notifier_block *this,
+-				     unsigned long event, void *ptr)
+-{
+-	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+-
+-	if (event != NETDEV_DOWN)
+-		return NOTIFY_DONE;
+-
+-	nf_flow_table_cleanup(dev);
+-
+-	return NOTIFY_DONE;
+-}
+-
+-static struct notifier_block flow_offload_netdev_notifier = {
+-	.notifier_call	= flow_offload_netdev_event,
+-};
+-
+@@ -490,16 +473 @@
+-	int err;
+-
+-	err = register_netdevice_notifier(&flow_offload_netdev_notifier);
+-	if (err)
+-		goto err;
+-
+-	err = nft_register_expr(&nft_flow_offload_type);
+-	if (err < 0)
+-		goto register_expr;
+-
+-	return 0;
+-
+-register_expr:
+-	unregister_netdevice_notifier(&flow_offload_netdev_notifier);
+-err:
+-	return err;
++	return nft_register_expr(&nft_flow_offload_type);
+@@ -511 +478,0 @@
+-	unregister_netdevice_notifier(&flow_offload_netdev_notifier);
